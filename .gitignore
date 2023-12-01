@@ -2,6 +2,8 @@ QualityControlExperiments/results/
 QualityControlExperiments/test.py
 QualityControlExperiments/test_images.ipynb
 
+simclr/__pycache__/
+backbone/__pycache__/
 # Pycharm
 .idea
 
