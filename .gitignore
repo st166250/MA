@@ -1,0 +1,13 @@
+QualityControlExperiments/results/
+QualityControlExperiments/test.py
+QualityControlExperiments/test_images.ipynb
+
+# Pycharm
+.idea
+
+# VS Code
+.vscode/
+
+# Jupyter NB Checkpoints
+.ipynb_checkpoints/
+QualityControlExperiments/.ipynb_checkpoints/
