@@ -1,9 +1,18 @@
 QualityControlExperiments/results/
 QualityControlExperiments/test.py
 QualityControlExperiments/test_images.ipynb
+QualityControlExperiments/combined_quality_evaluation.py
+QualityControlExperiments/local_iqa.py
+QualityControlExperiments/inference_motion.py
+QualityControlExperiments/Inference-2D_backup.ipynb
+QualityControlExperiments/__pycache__/
+
+results/
+traffic_light_empty_farbverlauf.png
 
 simclr/__pycache__/
 backbone/__pycache__/
+
 # Pycharm
 .idea
 
