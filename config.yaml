@@ -1,0 +1,22 @@
+SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp34_noPad__NoSimMotion_BS128_posDenom'
+WandB_Project: 'Simclr3Slices'
+WandB_Run: 'lr6e-4 Nopad, PosDenom NoSimMotion BS128'
+# SaveModel: Path to save the model, create folder before executing code
+# WandB_Project, WandB_Run: Names for wandb website
+
+DatasetPath: '/mnt/qdata/share/rakuest1/data/UKB/raw/abdominal_MRI/raw/' 
+#Path to data, data should be stored like .../raw/XXXXXXX/wat.nii.gz (e.g. .../raw/1246251/wat.nii.gz || .../raw/1246251/fat.nii.gz)
+DataTyp: "wat.nii.gz" # "fat.ni.gz", "inp.nii.gz", "opp.nii.gz" also possible, but not used here
+ 
+TrainKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_train_keys.npy'
+ValKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_val_keys.npy'
+#Path to train and validation keys in .npy format
+
+BatchSize: 128
+LearningRate: 0.0006 #max learning rate for scheduler, default = 0.001
+Epochs: 1000
+WarmupEpochs: 100
+Optimizer: 'Adam'
+Temperature: 0.1 # for ntxent loss
+
+arch: "resnet50"

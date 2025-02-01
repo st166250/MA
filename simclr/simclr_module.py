@@ -1,16 +1,22 @@
 import math
 from argparse import ArgumentParser
+import sys
 
 import torch
 from pytorch_lightning import LightningModule, Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from torch import Tensor, nn
 from torch.nn import functional as F
+import numpy as np
 
-from ..backbone.resnet import resnet50 ,resnet18
+
 from pl_bolts.optimizers.lars import LARS
 from pl_bolts.optimizers.lr_scheduler import linear_warmup_decay
+from torch.utils.data import DataLoader, SubsetRandomSampler
 
+
+sys.path.append("/home/students/studhoene1/imagequality/")
+from backbone.resnet import resnet50 ,resnet18
 
 
 class SyncFunction(torch.autograd.Function):
@@ -63,8 +69,8 @@ class SimCLR(LightningModule):
         num_samples: int,
         batch_size: int,
         num_nodes: int = 1,
-        arch: str = "resnet18",
-        hidden_mlp: int = 512,
+        arch: str = "resnet50",
+        hidden_mlp: int = 2048, #512 for resnet18, 2048 for resnet50
         feat_dim: int = 128,
         warmup_epochs: int = 10,
         max_epochs: int = 100,
@@ -137,6 +143,7 @@ class SimCLR(LightningModule):
 
         # final image in tuple is for online eval
         (img1, img2, _) = batch
+
         # get h representations, bolts resnet returns a list
         h1 = self(img1)
         h2 = self(img2)
@@ -144,19 +151,23 @@ class SimCLR(LightningModule):
         # get z representations
         z1 = self.projection(h1)
         z2 = self.projection(h2)
+
         loss = self.nt_xent_loss(z1, z2, self.temperature)
+        #lossV2 = self.nt_xent_loss(z1, z2, self.temperature)
+        #print("\nloss old: {:.3f}".format(loss))
+        #print("loss new: {:.3f}".format(lossV2))
         return loss
 
     def training_step(self, batch, batch_idx):
         loss = self.shared_step(batch)
 
-        self.log("train_loss", loss, on_step=True, on_epoch=False)
+        self.log("train_loss", loss, on_step=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         loss = self.shared_step(batch)
 
-        self.log("val_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("val_loss", loss, on_step=True, on_epoch=True)#, sync_dist=True)
         return loss
 
     def exclude_from_wt_decay(self, named_params, weight_decay, skip_list=("bias", "bn")):
@@ -248,3 +259,22 @@ class SimCLR(LightningModule):
         loss = -torch.log(pos / (neg + eps)).mean()
 
         return loss.contiguous()
+    
+    def nt_xent_lossV2(self, z1, z2, temp, eps=1e-6):
+        z = torch.cat([z1, z2], dim=0)
+
+        cosine_sim = torch.nn.functional.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=-1)
+
+        sim = torch.exp(cosine_sim / temp)
+        neg = sim.sum(dim=-1)
+        row_sub = Tensor(neg.shape).fill_(math.e ** (1 / temp)).to(neg.device)
+        neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
+
+        pos_ij = torch.diag(cosine_sim, int(len(z)/2)) # int(len(z)/2 == batch_size
+        pos_ji = torch.diag(cosine_sim, -int(len(z)/2))
+
+        pos = torch.cat([pos_ij, pos_ji], dim=0)
+        pos = torch.exp(pos / temp)
+
+        loss = -torch.log(pos / (torch.sum(neg, dim=-1) + eps)).mean()
+        return loss
