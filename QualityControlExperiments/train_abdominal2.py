@@ -69,7 +69,7 @@ def nt_xent_loss3Batch(z1, z2, zMotion, temp, eps=1e-6):
     pos = torch.cat([pos_ij, pos_ji], dim=0)
     pos = torch.exp(pos / temp)
 
-    loss = -torch.log(pos / (neg + pos)).mean() # +eps instead +pos +pos to avoid negative loss and include all samples form batch to neg, like in original ntxent
+    loss = -torch.log(pos / (neg + eps)).mean() # +eps instead +pos +pos to avoid negative loss and include all samples form batch to neg, like in original ntxent
 
     return loss
     
@@ -77,17 +77,13 @@ def train(model, dataloader, optimizer, scheduler, device, temperature, epoch):
     model.train()
     running_loss = 0.0
     for i, batch in enumerate(dataloader):
-        #img1, img2, img_motion = batch
-        #img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
-        img1, img2= batch
-        img1, img2 = img1.to(device), img2.to(device)
+        img1, img2, img_motion = batch
+        img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
 
         optimizer.zero_grad()
-        #z1, z2, zMotion = model.train_step(img1, img2, img_motion)
-        z1, z2 = model.train_step(img1, img2)
+        z1, z2, zMotion = model.train_step(img1, img2, img_motion)
 
-        #loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
-        loss = nt_xent_loss(z1, z2, temperature)
+        loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
         loss.backward()
 
         optimizer.step()
@@ -104,15 +100,11 @@ def validate(model, dataloader, device, temperature, epoch):
     val_loss = 0.0
     with torch.no_grad():
         for i, batch in enumerate(dataloader):
-            #img1, img2, img_motion = batch
-            #img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
-            img1, img2= batch
-            img1, img2 = img1.to(device), img2.to(device)
+            img1, img2, img_motion = batch
+            img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
             
-            z1, z2 = model.train_step(img1, img2)
-            #z1, z2, zMotion = model.train_step(img1, img2, img_motion)
-            #loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
-            loss = nt_xent_loss(z1, z2, temperature)
+            z1, z2, zMotion = model.train_step(img1, img2, img_motion)
+            loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
             val_loss += loss.item()
     return val_loss/len(dataloader)
     

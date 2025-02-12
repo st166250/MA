@@ -92,31 +92,21 @@ class SimCLR(nn.Module):
 
         return backbone(first_conv=self.first_conv, maxpool1=self.maxpool1, return_all_feature_maps=False)
 
-    # def train_step(self, x1, x2, xMotion):
-
-    #     # get h representations, bolts resnet returns a list
-    #     h1 = self.encoder(x1)[-1] #because resnet returns a list
-    #     h2 = self.encoder(x2)[-1]
-    #     hMotion = self.encoder(xMotion)[-1]
-
-    #     # get z representations
-    #     z1 = self.projection(h1)
-    #     z2 = self.projection(h2)
-    #     zMotion = self.projection(hMotion)
-        
-    #     return z1, z2, zMotion
-
-    def train_step(self, x1, x2):
+    def train_step(self, x1, x2, xMotion):
 
         # get h representations, bolts resnet returns a list
         h1 = self.encoder(x1)[-1] #because resnet returns a list
         h2 = self.encoder(x2)[-1]
+        hMotion = self.encoder(xMotion)[-1]
 
         # get z representations
         z1 = self.projection(h1)
         z2 = self.projection(h2)
+        zMotion = self.projection(hMotion)
+        
+        return z1, z2, zMotion
 
-        return z1, z2
+
     
     def forward(self, x):
         return self.encoder(x)[-1]

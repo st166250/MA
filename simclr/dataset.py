@@ -275,9 +275,9 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
             except FileNotFoundError:
                 continue
 
-            if count == 512 and small_dataset == True and validation == True: #640 // 512
+            if count == 440 and small_dataset == True and validation == True: #640 // 512
                 return subjects, subjects_paths
-            if count == 2432 and small_dataset == True:                       #2560 // 2432
+            if count == 1216 and small_dataset == True:                       #2560 // 2432
                 return subjects, subjects_paths
 
         return subjects, subjects_paths
@@ -290,10 +290,9 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
         subject = self.subjects[idx]
         volume = subject["data"]["data"][0].numpy()
 
-        #if self.validation:
-        #    return self.transform(volume, idx)
+        if self.validation:
+            return self.transform(volume, idx)
         
-        #xi, xj, x_z = self.transform(volume, idx)
-        xi, xj = self.transform(volume, idx)
+        xi, xj, x_z = self.transform(volume, idx)
 
-        return xi, xj#, x_z
+        return xi, xj, x_z
