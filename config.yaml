@@ -1,6 +1,6 @@
-SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp32_1_noPad_NoMotion_PosPair_1000Epochs'
+SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp39'
 WandB_Project: 'Simclr3Slices'
-WandB_Run: 'lr6e-4 Nopad, PosPair Neg+eps NoMotion'
+WandB_Run: 'Long Run, BS256, NoMotion/Motion as PosPair'
 # SaveModel: Path to save the model, create folder before executing code
 # WandB_Project, WandB_Run: Names for wandb website
 
@@ -12,7 +12,7 @@ TrainKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_train_keys.
 ValKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_val_keys.npy'
 #Path to train and validation keys in .npy format
 
-BatchSize: 64
+BatchSize: 256
 LearningRate: 0.0006 #max learning rate for scheduler, default = 0.001
 Epochs: 1000
 WarmupEpochs: 100

@@ -166,14 +166,14 @@ class SimCLR3SlicesTransform(object):
         data_transforms = transforms.Compose(data_transforms)
         self.train_transform = transforms.Compose([data_transforms])
 
-        transform3D = tio.transforms.Compose([
+        self.transform3D = tio.transforms.Compose([
             tio.transforms.ZNormalization(masking_method=None),
         ])
 
     
     def __call__(self, volume, idx):
-        #decider = random.choice([0,1])
-        decider = 0
+        decider = random.choice([0,1])
+        #decider = 1
         if idx in self.volume_motion_indices:
             volume_motion_index = self.volume_motion_indices.index(idx)
             volume_motion = self.volume_motion_list[volume_motion_index]
@@ -183,22 +183,23 @@ class SimCLR3SlicesTransform(object):
             #motion = tio.Compose([tio.transforms.RandomMotion(num_transforms=1, )])
             volume_motion = motion(np.expand_dims(volume, axis=0))
             volume_motion = np.squeeze(volume_motion, axis=0)
-            self.volume_motion_list.append(volume)
+            self.volume_motion_list.append(volume_motion)
 
         
         slice_idx = np.random.randint(volume.shape[2])
         slice_img = volume[:,:,slice_idx]
         slice_motion = volume_motion[:,:,slice_idx]
 
-        slice_img = np.pad(slice_img, ((0,0), (28,28)))
-        slice_motion = np.pad(slice_motion, ((0,0), (28,28)))
+        #slice_img = np.pad(slice_img, ((0,0), (28,28)))
+        #slice_motion = np.pad(slice_motion, ((0,0), (28,28)))
         
         if decider == 0:
             x_i = self.train_transform(slice_img)
             x_j = self.train_transform(slice_img)
+            #x_z = self.train_transform(volume[:,:,(slice_idx+150)%volume.shape[2]])
             x_z = self.train_transform(slice_motion)
 
-        elif decider == 1:
+        else:
             x_i = self.train_transform(slice_motion)
             x_j = self.train_transform(slice_motion)
             x_z = self.train_transform(slice_img)

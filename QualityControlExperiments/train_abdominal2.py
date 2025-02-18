@@ -10,6 +10,11 @@ import wandb
 import os
 import matplotlib.pylab as plt
 
+import torch.distributed as dist
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
+
 #sys.path.append("/home/students/studhoene1/imagequality/")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +30,16 @@ def fParseConfig(sFile):
         cfg = yaml.safe_load(ymlfile)
     return cfg
 
+def setup(rank ,world_size):
+    "initialize distributed training"
+    os.environ["MASTER_ADDR"] = "localhost"  # Localhost
+    os.environ["MASTER_PORT"] = "29500"  # Any free port (commonly used: 29500)
+    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    torch.cuda.set_device(rank)
+
+def cleanup():
+    "destroy process group for distributed training"
+    dist.destroy_process_group()
 
 def nt_xent_loss(z1, z2, temp, eps=1e-6):
     z = torch.cat([z1, z2], dim=0)
@@ -69,19 +84,22 @@ def nt_xent_loss3Batch(z1, z2, zMotion, temp, eps=1e-6):
     pos = torch.cat([pos_ij, pos_ji], dim=0)
     pos = torch.exp(pos / temp)
 
-    loss = -torch.log(pos / (neg + eps)).mean() # +eps instead +pos +pos to avoid negative loss and include all samples form batch to neg, like in original ntxent
+    loss = -torch.log(pos / (neg + pos)).mean() # +eps instead +pos +pos to avoid negative loss and include all samples form batch to neg, like in original ntxent
 
     return loss
     
 def train(model, dataloader, optimizer, scheduler, device, temperature, epoch):
     model.train()
     running_loss = 0.0
+
+    dataloader.sampler.set_epoch(epoch) #Ensure different shuffing per epoch
+
     for i, batch in enumerate(dataloader):
         img1, img2, img_motion = batch
         img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
 
         optimizer.zero_grad()
-        z1, z2, zMotion = model.train_step(img1, img2, img_motion)
+        z1, z2, zMotion = model.module.train_step(img1, img2, img_motion)
 
         loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
         loss.backward()
@@ -91,7 +109,11 @@ def train(model, dataloader, optimizer, scheduler, device, temperature, epoch):
             scheduler.step()
 
         running_loss += loss.item()
-    return running_loss/len(dataloader)
+
+    #gather loss across processes from ddp
+    total_loss = torch.tensor(running_loss, device=device)
+    dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)     #aggregate loss across GPUs
+    return total_loss.item() / dist.get_world_size() / len(dataloader)
 
 
 
@@ -103,27 +125,37 @@ def validate(model, dataloader, device, temperature, epoch):
             img1, img2, img_motion = batch
             img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
             
-            z1, z2, zMotion = model.train_step(img1, img2, img_motion)
+            z1, z2, zMotion = model.module.train_step(img1, img2, img_motion)
             loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
             val_loss += loss.item()
-    return val_loss/len(dataloader)
+
+    #gather loss across processes from ddp
+    total_loss = torch.tensor(val_loss, device=device)
+    dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)     #aggregate loss across GPUs
+    return total_loss.item() / dist.get_world_size() / len(dataloader)
     
 
 
-if __name__ == "__main__":
+def main(rank, world_size):
     torch.set_printoptions(threshold=99999, edgeitems=1000, linewidth=200)
     print("Start training")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    setup(rank, world_size)
+
+
+    device = torch.device(f"cuda:{rank}")
     print("Using device: {}".format(device))
 
     cfg = fParseConfig('/home/students/studhoene1/imagequality/config.yaml')
 
-    wandb.login(key='9506beebc9d4b024ffeb5fba4298098fac09b871')
-    wandb.init(project=cfg['WandB_Project'], name=cfg['WandB_Run'])
-    wandb.watch_called = False
-
-    model = SimCLR(arch=cfg['arch'])
-    model.to(device)
+    if rank == 0:
+        print("world size: {}, rank: {}".format(world_size, rank))
+        wandb.login(key='9506beebc9d4b024ffeb5fba4298098fac09b871')
+        wandb.init(project=cfg['WandB_Project'], name=cfg['WandB_Run'])
+        wandb.watch_called = False
+    if rank >0: 
+        print("world size: {}, rank: {}".format(world_size, rank))
+    model = SimCLR(arch=cfg['arch']).to(rank)
+    model = DDP(model, device_ids=[rank], output_device=rank, find_unused_parameters=True)
     #checkpoint = torch.load("/home/raecker1/3DSSL/weights/first_wat_crop_02TO1/checkpoints/epoch=372-step=5287275.ckpt")
     #state_dict = checkpoint['state_dict'] 
     #model = SimCLR(arch=cfg['arch'])
@@ -136,13 +168,15 @@ if __name__ == "__main__":
     t_data = time()
     train_dataset = SimCLR3DDataset_ForMotion(cfg['DatasetPath'], cfg['TrainKeysPath'],
                      preprocessing_train, validation=False, small_dataset=True, datatyp=cfg['DataTyp'])
-    trainloader = DataLoader(train_dataset, batch_size=cfg['BatchSize'],
-                                          shuffle=True, num_workers=0)
+    train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True, drop_last=True)
+    trainloader = DataLoader(train_dataset, batch_size=cfg['BatchSize'], sampler=train_sampler, num_workers=0, pin_memory=True)
     
     val_dataset = SimCLR3DDataset_ForMotion(cfg['DatasetPath'], cfg['ValKeysPath'],
                       preprocessing_val, validation=True, small_dataset=True, datatyp=cfg['DataTyp'])
-    valloader = DataLoader(val_dataset, batch_size=cfg['BatchSize'], shuffle=False,
-                                         num_workers=0)
+    val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False, drop_last=True)
+    valloader = DataLoader(val_dataset, batch_size=cfg['BatchSize'], sampler=val_sampler, num_workers=0, pin_memory=True)
+
+    print(f"Rank {rank}: Training dataset size: {len(train_dataset)}, Validation dataset size: {len(val_dataset)}")
     # for batch in trainloader:
     #     print(len(trainloader))
     #     a, b, c = batch
@@ -174,21 +208,29 @@ if __name__ == "__main__":
         t1 = time()
         train_loss = train(model, trainloader, optimizer, scheduler, device, cfg['Temperature'], e)
         val_loss = validate(model, valloader, device, cfg['Temperature'], e)
-        print("Train Loss for epoch {}: {:.3f}".format(e+1, train_loss))
-        print("Validation Loss for epoch {}: {:.3f}".format(e+1, val_loss))
-        print("Time for training epoch {}/{}: {:.2f} Min.".format(e+1, cfg['Epochs'], (time()-t1)/60))
 
-        if (e%2 == 0):
-            wandb.log({
-                "train loss": train_loss,
-                "val loss": val_loss,
-                "learning rate": scheduler.get_last_lr()[0],
-                "epoch": e+1
-            })
+        if rank==0:
+            print("Train Loss for epoch {}: {:.3f}".format(e+1, train_loss))
+            print("Validation Loss for epoch {}: {:.3f}".format(e+1, val_loss))
+            print("Time for training epoch {}/{}: {:.2f} Min.".format(e+1, cfg['Epochs'], (time()-t1)/60))
+
+            if (e%2 == 0):
+                wandb.log({
+                    "train loss": train_loss,
+                    "val loss": val_loss,
+                    "learning rate": scheduler.get_last_lr()[0],
+                    "epoch": e+1
+                })
         
-        if e > 700 and ((e+1) % 50 == 0 or (e+1==1000)):
-            model_save_path = os.path.join(cfg['SaveModel'], f"simclr3Slices_changePosNeg_randomMotion_epoch{(e+1)/2}_loss_{train_loss}.pth") #ToDo: Change Model name
-            torch.save(model.state_dict(), model_save_path)
+            if e > 700 and ((e+1) % 50 == 0 or (e+1==1000)):
+                model_save_path = os.path.join(cfg['SaveModel'], f"simclr3Slices_randomMotion_epoch{(e+1)/2}_loss_{train_loss}.pth") #ToDo: Change Model name
+                torch.save(model.state_dict(), model_save_path)
 
+    if rank==0:
+        wandb.finish()
 
-    wandb.finish()
+    cleanup()
+
+if __name__ == "__main__":
+    world_size = torch.cuda.device_count()  # Number of GPUs available
+    mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)

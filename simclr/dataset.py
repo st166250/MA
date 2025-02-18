@@ -259,6 +259,7 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
         self.small_dataset = small_dataset
         self.datatyp = datatyp
 
+
     @staticmethod
     def _create_subject_list(root_path, all_subjects, small_dataset, validation, datatyp):
         count = 0
@@ -275,9 +276,9 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
             except FileNotFoundError:
                 continue
 
-            if count == 440 and small_dataset == True and validation == True: #640 // 512
+            if count == 1024 and small_dataset == True and validation == True: #576
                 return subjects, subjects_paths
-            if count == 1216 and small_dataset == True:                       #2560 // 2432
+            if count == 7680 and small_dataset == True:                       #1984
                 return subjects, subjects_paths
 
         return subjects, subjects_paths
