@@ -88,11 +88,12 @@ def nt_xent_loss3Batch(z1, z2, zMotion, temp, eps=1e-6):
 
     return loss
     
-def train(model, dataloader, optimizer, scheduler, device, temperature, epoch):
+def train(model, dataloader, optimizer, scheduler, device, temperature, epoch, rank):
     model.train()
     running_loss = 0.0
 
     dataloader.sampler.set_epoch(epoch) #Ensure different shuffing per epoch
+    print("len dataloader {},  rank: {}".format(len(dataloader), rank))
 
     for i, batch in enumerate(dataloader):
         img1, img2, img_motion = batch
@@ -113,6 +114,7 @@ def train(model, dataloader, optimizer, scheduler, device, temperature, epoch):
     #gather loss across processes from ddp
     total_loss = torch.tensor(running_loss, device=device)
     dist.all_reduce(total_loss, op=dist.ReduceOp.SUM)     #aggregate loss across GPUs
+
     return total_loss.item() / dist.get_world_size() / len(dataloader)
 
 
@@ -206,14 +208,16 @@ def main(rank, world_size):
 
     for e in range(cfg['Epochs']):
         t1 = time()
-        train_loss = train(model, trainloader, optimizer, scheduler, device, cfg['Temperature'], e)
+        train_loss = train(model, trainloader, optimizer, scheduler, device, cfg['Temperature'], e, rank)
         val_loss = validate(model, valloader, device, cfg['Temperature'], e)
+
+        if e == 10: 
+            aasa
 
         if rank==0:
             print("Train Loss for epoch {}: {:.3f}".format(e+1, train_loss))
             print("Validation Loss for epoch {}: {:.3f}".format(e+1, val_loss))
             print("Time for training epoch {}/{}: {:.2f} Min.".format(e+1, cfg['Epochs'], (time()-t1)/60))
-
             if (e%2 == 0):
                 wandb.log({
                     "train loss": train_loss,
@@ -233,4 +237,5 @@ def main(rank, world_size):
 
 if __name__ == "__main__":
     world_size = torch.cuda.device_count()  # Number of GPUs available
+    print("World size: {}".format(world_size))
     mp.spawn(main, args=(world_size,), nprocs=world_size, join=True)

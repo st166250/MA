@@ -173,13 +173,14 @@ class SimCLR3SlicesTransform(object):
     
     def __call__(self, volume, idx):
         decider = random.choice([0,1])
-        #decider = 1
+        #decider = 0
         if idx in self.volume_motion_indices:
             volume_motion_index = self.volume_motion_indices.index(idx)
             volume_motion = self.volume_motion_list[volume_motion_index]
         else: 
             self.volume_motion_indices.append(idx)
-            motion = random.choice(self.motion_list)
+            #motion = random.choice(self.motion_list)
+            motion = self.motion_1
             #motion = tio.Compose([tio.transforms.RandomMotion(num_transforms=1, )])
             volume_motion = motion(np.expand_dims(volume, axis=0))
             volume_motion = np.squeeze(volume_motion, axis=0)

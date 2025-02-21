@@ -9,7 +9,7 @@
 #SBATCH --job-name=TutorialJob
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=student
-#SBATCH --gpus=1
+#SBATCH --gpus=2
 #SBATCH --time 7-0
 #SBATCH --nodelist=node-gpu-01
 #SBATCH --error=jobs/job.%J.%x.err
