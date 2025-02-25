@@ -1,6 +1,6 @@
-SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp36_1gpu' #where to save the trained model
-WandB_Project: 'Simclr3Slices'
-WandB_Run: 'TEST'
+SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/exp5' #where to save the trained model
+WandB_Project: '2GPU Simclr3Slices'
+WandB_Run: 'exp5'
 # SaveModel: Path to save the model, create folder before executing code
 # WandB_Project, WandB_Run: Names for wandb website
 
@@ -14,8 +14,8 @@ ValKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_val_keys.npy'
 
 BatchSize: 64 #256
 LearningRate: 0.0006 #max learning rate for scheduler, default = 0.001
-Epochs: 1000
-WarmupEpochs: 100
+Epochs: 2000
+WarmupEpochs: 200
 Optimizer: 'Adam'
 Temperature: 0.1 # for ntxent loss
 

@@ -278,7 +278,7 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
 
             if count == 128 and small_dataset == True and validation == True: #1024 576 #320
                 return subjects, subjects_paths
-            if count == 256 and small_dataset == True:                       #7680 1984 #1280
+            if count == 512 and small_dataset == True:                       #7680 1984 #1280
                 return subjects, subjects_paths
 
         return subjects, subjects_paths

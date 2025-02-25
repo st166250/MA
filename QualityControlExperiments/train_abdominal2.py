@@ -41,41 +41,54 @@ def cleanup():
     "destroy process group for distributed training"
     dist.destroy_process_group()
 
-def nt_xent_loss(z1, z2, temp, eps=1e-6):
-    z = torch.cat([z1, z2], dim=0)
+class SyncFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, tensor):
+        ctx.batch_size = tensor.shape[0]
 
-    cosine_sim = torch.nn.functional.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=-1)
+        gathered_tensor = [torch.zeros_like(tensor) for _ in range(torch.distributed.get_world_size())]
 
-    sim = torch.exp(cosine_sim / temp)
-    neg = sim.sum(dim=-1)
-    row_sub = Tensor(neg.shape).fill_(math.e ** (1 / temp)).to(neg.device)
-    #neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
-    neg = neg - row_sub
+        torch.distributed.all_gather(gathered_tensor, tensor)
+        gathered_tensor = torch.cat(gathered_tensor, 0)
 
-    pos_ij = torch.diag(cosine_sim, int(len(z)/2)) # int(len(z)/2 == batch_size
-    pos_ji = torch.diag(cosine_sim, -int(len(z)/2))
-    pos = torch.cat([pos_ij, pos_ji], dim=0)
-    pos = torch.exp(pos / temp)
+        return gathered_tensor
 
-    loss = -torch.log(pos / (neg + pos)).mean() #try with denom instead neg
+    @staticmethod
+    def backward(ctx, grad_output):
+        grad_input = grad_output.clone().contiguous()
+        torch.distributed.all_reduce(grad_input, op=torch.distributed.ReduceOp.SUM, async_op=False)
 
-    return loss
+        idx_from = torch.distributed.get_rank() * ctx.batch_size
+        idx_to = (torch.distributed.get_rank() + 1) * ctx.batch_size
+        return grad_input[idx_from:idx_to]
     
+
 def nt_xent_loss3Batch(z1, z2, zMotion, temp, eps=1e-6):
+    if torch.distributed.is_available() and torch.distributed.is_initialized():
+        z1_dist = SyncFunction.apply(z1)
+        z2_dist = SyncFunction.apply(z2)
+        zMotion_dist = SyncFunction.apply(zMotion)
+    else:
+        z1_dist = z1
+        z2_dist = z2
+        zMotion_dist = zMotion
+    
     z = torch.cat([z1, z2, zMotion], dim=0)
+    z_dist = torch.cat([z1_dist, z2_dist, zMotion_dist], dim=0)
 
     #cosine_sim = torch.nn.functional.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=-1)
-    cosine_sim = torch.mm(z, torch.transpose(z,0,1))
+    #cosine_sim = torch.mm(z, torch.transpose(z,0,1))
+    cosine_sim = torch.mm(z, z_dist.t().contiguous())
 
     sim = torch.exp(cosine_sim / temp)
 
-    neg = torch.cat([sim[:,:int(len(z)/3)], sim[:,-int(len(z)/3):]], dim=1).sum(dim=-1) #only use first and last representation as negative pairs
+    neg = torch.cat([sim[:,:int(len(z_dist)/3)], sim[:,-int(len(z_dist)/3):]], dim=1).sum(dim=-1) #only use first and last representation as negative pairs
     neg = torch.cat([neg[:int(len(z)/3)], neg[-int(len(z)/3):]], dim=0)  #only use first and last representation as negative pairs 
     row_sub = Tensor(neg.shape).fill_(math.e ** (1 / temp)).to(neg.device)
     #neg = torch.clamp(neg - row_sub, min=eps)  # clamp for numerical stability
     neg = neg - row_sub
 
-    pos_ij = torch.diag(cosine_sim, int(len(z)/3)) # int(len(z)/3 == batch_size 
+    pos_ij = torch.diag(cosine_sim, int(len(z_dist)/3)) # int(len(z)/3 == batch_size 
     pos_ji = torch.diag(cosine_sim, -int(len(z)/3))
 
     pos_ij = pos_ij[:int(len(z)/3)]  #only positive samples between first two representations
@@ -84,16 +97,15 @@ def nt_xent_loss3Batch(z1, z2, zMotion, temp, eps=1e-6):
     pos = torch.cat([pos_ij, pos_ji], dim=0)
     pos = torch.exp(pos / temp)
 
-    loss = -torch.log(pos / (neg + pos)).mean() # +eps instead +pos +pos to avoid negative loss and include all samples form batch to neg, like in original ntxent
+    loss = -torch.log(pos / (neg + eps)).mean() # +eps instead +pos +pos to avoid negative loss and include all samples form batch to neg, like in original ntxent
 
-    return loss
+    return loss.contiguous()
     
 def train(model, dataloader, optimizer, scheduler, device, temperature, epoch, rank):
     model.train()
     running_loss = 0.0
 
     dataloader.sampler.set_epoch(epoch) #Ensure different shuffing per epoch
-    print("len dataloader {},  rank: {}".format(len(dataloader), rank))
 
     for i, batch in enumerate(dataloader):
         img1, img2, img_motion = batch
@@ -211,14 +223,11 @@ def main(rank, world_size):
         train_loss = train(model, trainloader, optimizer, scheduler, device, cfg['Temperature'], e, rank)
         val_loss = validate(model, valloader, device, cfg['Temperature'], e)
 
-        if e == 10: 
-            aasa
-
         if rank==0:
             print("Train Loss for epoch {}: {:.3f}".format(e+1, train_loss))
             print("Validation Loss for epoch {}: {:.3f}".format(e+1, val_loss))
             print("Time for training epoch {}/{}: {:.2f} Min.".format(e+1, cfg['Epochs'], (time()-t1)/60))
-            if (e%2 == 0):
+            if (e%4 == 0):
                 wandb.log({
                     "train loss": train_loss,
                     "val loss": val_loss,
@@ -226,8 +235,8 @@ def main(rank, world_size):
                     "epoch": e+1
                 })
         
-            if e > 700 and ((e+1) % 50 == 0 or (e+1==1000)):
-                model_save_path = os.path.join(cfg['SaveModel'], f"simclr3Slices_randomMotion_epoch{(e+1)/2}_loss_{train_loss}.pth") #ToDo: Change Model name
+            if e > 1500 and ((e+1) % 100 == 0 or (e+1==2000)):
+                model_save_path = os.path.join(cfg['SaveModel'], f"simclr3Slices{(e+1)/2}_loss_{train_loss}.pth") #ToDo: Change Model name
                 torch.save(model.state_dict(), model_save_path)
 
     if rank==0:
