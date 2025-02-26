@@ -181,12 +181,12 @@ def main(rank, world_size):
     preprocessing_val = SimCLR3SlicesTransform()
     t_data = time()
     train_dataset = SimCLR3DDataset_ForMotion(cfg['DatasetPath'], cfg['TrainKeysPath'],
-                     preprocessing_train, validation=False, small_dataset=True, datatyp=cfg['DataTyp'])
+                     preprocessing_train, validation=False, small_dataset=cfg['SmallDataset'], datatyp=cfg['DataTyp'])
     train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True, drop_last=True)
     trainloader = DataLoader(train_dataset, batch_size=cfg['BatchSize'], sampler=train_sampler, num_workers=0, pin_memory=True)
     
     val_dataset = SimCLR3DDataset_ForMotion(cfg['DatasetPath'], cfg['ValKeysPath'],
-                      preprocessing_val, validation=True, small_dataset=True, datatyp=cfg['DataTyp'])
+                      preprocessing_val, validation=True, small_dataset=cfg['SmallDataset'], datatyp=cfg['DataTyp'])
     val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False, drop_last=True)
     valloader = DataLoader(val_dataset, batch_size=cfg['BatchSize'], sampler=val_sampler, num_workers=0, pin_memory=True)
 

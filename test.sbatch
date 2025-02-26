@@ -12,8 +12,8 @@
 #SBATCH --gpus=2
 #SBATCH --time 7-0
 #SBATCH --nodelist=node-gpu-01
-#SBATCH --error=jobs/job.%J.%x.err
-#SBATCH --output=jobs/job.%J.%x.out
+#SBATCH --error=jobs_2gpu/job.%J.%x.err
+#SBATCH --output=jobs_2gpu/job.%J.%x.out
 
 echo "Job started on $(date)"
 module load cuda/11.8
