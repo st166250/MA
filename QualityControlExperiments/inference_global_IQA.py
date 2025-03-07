@@ -23,6 +23,7 @@ from torch.utils.data import DataLoader
 
 from simclr.simclr_module2 import SimCLR
 #from simclr.simclr_module import SimCLR
+from backbone.ssl_head import SSLHead
 
 from simclr.transforms import SimCLRTrainDataTransform, SimCLREvalDataTransform
 from simclr.dataset import SimCLR3DDataset, NakoIQADataset, NRUDataset
@@ -66,11 +67,12 @@ def load_slice(subj_idx, idx, noise=None):
         slc = noise(val_dataset[subj_idx])["data"]["data"][0,:,:,idx]
     else:
         slc = val_dataset[subj_idx]["data"]["data"][0,:,:,idx]
+    
+    
+    slc = slc.squeeze(0).squeeze(-1)
+    slc = np.pad(slc, ((0,0), (28,28)))
+    slc = torch.from_numpy(slc)
     slc = preprocessings2D(slc.unsqueeze(0).unsqueeze(-1))
-    #slc = slc.squeeze(0).squeeze(-1)
-
-    #slc = np.pad(slc, ((0,0), (28,28)))
-    #slc = torch.from_numpy(slc)
     return slc.squeeze(-1)
 
 def load_slice_nako(subj_idx, idx, noise=None):
@@ -78,9 +80,11 @@ def load_slice_nako(subj_idx, idx, noise=None):
         slc = noise(nako_iqa_dataset[subj_idx])["data"]["data"][0,20:-20,:224,idx].unsqueeze(0)
     else:
         slc = nako_iqa_dataset[subj_idx]["data"]["data"][0,20:-20,:224,idx].unsqueeze(0)
+
+    slc = torchvision.transforms.functional.resize(slc, [224, 224])
     slc = preprocessings2D(slc.unsqueeze(-1))
     slc = slc.squeeze(-1)
-    # #slc = torchvision.transforms.functional.resize(slc, [224, 224])
+
     # slc = np.pad(slc, ((0,0), (28,28)), mode='edge')
     # slc = torch.from_numpy(slc).unsqueeze(0)
     # #slice = torch.from_numpy(slice)
@@ -91,9 +95,10 @@ def load_slice_nako_deep(subj_idx, idx, noise=None):
         slc = noise(nako_iqa_dataset_deep[subj_idx])["data"]["data"][0,20:-20,:224,idx].unsqueeze(0)
     else:
         slc = nako_iqa_dataset_deep[subj_idx]["data"]["data"][0,20:-20,:224,idx].unsqueeze(0)
+
+    slc = torchvision.transforms.functional.resize(slc, [224, 224])
     slc = preprocessings2D(slc.unsqueeze(-1))
     slc = slc.squeeze(-1)
-    # #slc = torchvision.transforms.functional.resize(slc, [224, 224])
     # slc = np.pad(slc, ((0,0), (28,28)), mode='edge')
     # slc = torch.from_numpy(slc).unsqueeze(0)
     return slc
@@ -396,7 +401,7 @@ def exp_incr_motion():
         axs[i].set_title(f'Motion {i}: sim HQ: {round(float(sim_HQ), 3)}/ sim LQ: {round(float(sim_LQ), 3)}')
         axs[i].axis('off')
 
-    plt.savefig('/home/students/studhoene1/imagequality/QualityControlExperiments/results/3SLices_NTXENT/exp31_setting_motion_sim.png')
+    plt.savefig('/home/students/studhoene1/imagequality/QualityControlExperiments/results/3SLices_NTXENT/2gpu_ViT_setting_motion_sim.png')
 
 #Experiment: Increasing noise 
 def exp_incr_noise():
@@ -439,13 +444,23 @@ def exp_incr_noise():
     plt.close()
 
 
-model = SimCLR(arch="resnet50")
-model.load_state_dict(torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp31_noPad__NoSimMotion_1000Epochs/simclr3Slices_changePosNeg_randomMotion_epoch500.0_loss_0.023298370504849834.pth'))
+#model = SimCLR(arch="resnet50")
+model = SSLHead()
+#model.load_state_dict(torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp40/simclr3Slices_randomMotion_epoch500.0_loss_0.0226720763790992.pth'))
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/first_wat_crop_02TO1/checkpoints/epoch=372-step=5287275.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/students/studhoene1/test_imqual/imagequality/checkpoints/from_scratch_small_datasetepoch=05_train_loss=0.06.ckpt")
-#model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_4/checkpoints/epoch=892-step=12658275.ckpt")
+#model = SimCLR.load_from_checkpoint("/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp35_2_moreData/simclr3Slices_randomMotion_epoch500.0_loss_0.01984104802531581.pth")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_5/checkpoints/epoch=217-step=3090150.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_8/checkpoints/epoch=179-step=5103000.ckpt")
+checkpoint = torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT1/simclr3Slices1000.0_loss_1.543333649635315.pth')
+# Remove the "module." prefix if present
+new_state_dict = {}
+for key, value in checkpoint.items():
+    new_key = key.replace("module.", "")  # Remove 'module.' from keys
+    new_state_dict[new_key] = value
+
+# Load into the model
+model.load_state_dict(new_state_dict)
 
 device = torch.device("cuda:0")
 model.to(device)

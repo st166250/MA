@@ -8,7 +8,9 @@ import yaml
 from torch.utils.data import DataLoader
 import wandb
 import os
+from torchsummary import summary
 import matplotlib.pylab as plt
+from datetime import datetime, timedelta
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -24,6 +26,8 @@ from simclr.simclr_module2 import SimCLR
 from simclr.transforms import SimCLRTrainDataTransform, SimCLREvalDataTransform, SimCLR3SlicesTransform
 from simclr.dataset import SimCLR3DDatasetTo2D, SimCLR3DDataset_ForMotion
 
+from backbone.ssl_head import SSLHead
+
 def fParseConfig(sFile):
     # get config file
     with open(sFile, 'r') as ymlfile:
@@ -34,7 +38,7 @@ def setup(rank ,world_size):
     "initialize distributed training"
     os.environ["MASTER_ADDR"] = "localhost"  # Localhost
     os.environ["MASTER_PORT"] = "29500"  # Any free port (commonly used: 29500)
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    dist.init_process_group("nccl", rank=rank, world_size=world_size, timeout=timedelta(seconds=1800))
     torch.cuda.set_device(rank)
 
 def cleanup():
@@ -153,8 +157,8 @@ def validate(model, dataloader, device, temperature, epoch):
 def main(rank, world_size):
     torch.set_printoptions(threshold=99999, edgeitems=1000, linewidth=200)
     print("Start training")
-    setup(rank, world_size)
 
+    setup(rank, world_size)
 
     device = torch.device(f"cuda:{rank}")
     print("Using device: {}".format(device))
@@ -168,8 +172,13 @@ def main(rank, world_size):
         wandb.watch_called = False
     if rank >0: 
         print("world size: {}, rank: {}".format(world_size, rank))
-    model = SimCLR(arch=cfg['arch']).to(rank)
-    model = DDP(model, device_ids=[rank], output_device=rank, find_unused_parameters=True)
+
+    if 1: 
+        model = SSLHead().to(rank)  
+        model = DDP(model, device_ids=[rank], output_device=rank, find_unused_parameters=True)
+    else:    
+        model = SimCLR(arch=cfg['arch']).to(rank)
+        model = DDP(model, device_ids=[rank], output_device=rank, find_unused_parameters=True)
     #checkpoint = torch.load("/home/raecker1/3DSSL/weights/first_wat_crop_02TO1/checkpoints/epoch=372-step=5287275.ckpt")
     #state_dict = checkpoint['state_dict'] 
     #model = SimCLR(arch=cfg['arch'])

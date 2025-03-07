@@ -138,7 +138,7 @@ class SimCLR3SlicesTransform(object):
         self.volume_motion_list = []
         self.volume_motion_indices = []
 
-        #self.motion = tio.transforms.RandomMotion(num_transforms=2, degrees=(-7.5,7.5), translation=(-7.5,7.5))
+        self.motion = tio.transforms.RandomMotion(num_transforms=2, degrees=(1,1), translation=(1,1))
         self.motion_1 = tio.Motion(degrees=np.array([[0.5, 0.5, 0.5]]), translation=np.array([[0.5, 0.5, 0.5]]),
                           times=np.array([0.5]), image_interpolation='linear')
         self.motion_2 = tio.Motion(degrees=np.array([[1.0, 1.0, 1.0]]), translation=np.array([[1.0, 1.0, 1.0]]),
@@ -160,7 +160,7 @@ class SimCLR3SlicesTransform(object):
         data_transforms = [
             rescale,
             transforms.ToTensor(),
-            transforms.RandomResizedCrop(size=(self.input_height,self.input_height), scale=(0.2, 1), ratio=(1.0, 1.0))
+            transforms.RandomResizedCrop(size=(self.input_height,self.input_height), scale=(0.2, 1))
         ]
 
         data_transforms = transforms.Compose(data_transforms)
@@ -180,7 +180,8 @@ class SimCLR3SlicesTransform(object):
         else: 
             self.volume_motion_indices.append(idx)
             #motion = random.choice(self.motion_list)
-            motion = self.motion_1
+            #motion = self.motion_1
+            motion = self.motion
             #motion = tio.Compose([tio.transforms.RandomMotion(num_transforms=1, )])
             volume_motion = motion(np.expand_dims(volume, axis=0))
             volume_motion = np.squeeze(volume_motion, axis=0)
@@ -191,8 +192,6 @@ class SimCLR3SlicesTransform(object):
         slice_img = volume[:,:,slice_idx]
         slice_motion = volume_motion[:,:,slice_idx]
 
-        #slice_img = np.pad(slice_img, ((0,0), (28,28)))
-        #slice_motion = np.pad(slice_motion, ((0,0), (28,28)))
         
         if decider == 0:
             x_i = self.train_transform(slice_img)
