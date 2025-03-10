@@ -172,36 +172,36 @@ class SimCLR3SlicesTransform(object):
 
     
     def __call__(self, volume, idx):
-        decider = random.choice([0,1])
-        #decider = 0
-        if idx in self.volume_motion_indices:
-            volume_motion_index = self.volume_motion_indices.index(idx)
-            volume_motion = self.volume_motion_list[volume_motion_index]
-        else: 
-            self.volume_motion_indices.append(idx)
-            #motion = random.choice(self.motion_list)
-            #motion = self.motion_1
-            motion = self.motion
-            #motion = tio.Compose([tio.transforms.RandomMotion(num_transforms=1, )])
-            volume_motion = motion(np.expand_dims(volume, axis=0))
-            volume_motion = np.squeeze(volume_motion, axis=0)
-            self.volume_motion_list.append(volume_motion)
+        #decider = random.choice([0,1])
+        decider = 0
+        # if idx in self.volume_motion_indices:
+        #     volume_motion_index = self.volume_motion_indices.index(idx)
+        #     volume_motion = self.volume_motion_list[volume_motion_index]
+        # else: 
+        #     self.volume_motion_indices.append(idx)
+        #     #motion = random.choice(self.motion_list)
+        #     #motion = self.motion_1
+        #     motion = self.motion
+        #     #motion = tio.Compose([tio.transforms.RandomMotion(num_transforms=1, )])
+        #     volume_motion = motion(np.expand_dims(volume, axis=0))
+        #     volume_motion = np.squeeze(volume_motion, axis=0)
+        #     self.volume_motion_list.append(volume_motion)
 
         
         slice_idx = np.random.randint(volume.shape[2])
         slice_img = volume[:,:,slice_idx]
-        slice_motion = volume_motion[:,:,slice_idx]
+        #slice_motion = volume_motion[:,:,slice_idx]
 
         
         if decider == 0:
             x_i = self.train_transform(slice_img)
             x_j = self.train_transform(slice_img)
-            #x_z = self.train_transform(volume[:,:,(slice_idx+150)%volume.shape[2]])
-            x_z = self.train_transform(slice_motion)
+            x_z = self.train_transform(volume[:,:,(slice_idx+150)%volume.shape[2]])
+        #     x_z = self.train_transform(slice_motion)
 
-        else:
-            x_i = self.train_transform(slice_motion)
-            x_j = self.train_transform(slice_motion)
-            x_z = self.train_transform(slice_img)
+        # else:
+        #     x_i = self.train_transform(slice_motion)
+        #     x_j = self.train_transform(slice_motion)
+        #     x_z = self.train_transform(slice_img)
 
         return x_i, x_j, x_z

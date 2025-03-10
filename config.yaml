@@ -1,6 +1,6 @@
-SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/XXX' #where to save the trained model
+SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT_noPooling_noMOtion' #where to save the trained model
 WandB_Project: '2GPU Simclr3Slices'
-WandB_Run: 'ViT'
+WandB_Run: 'ViT_NoPoolingNoMotion'
 # SaveModel: Path to save the model, create folder before executing code
 # WandB_Project, WandB_Run: Names for wandb website
 
