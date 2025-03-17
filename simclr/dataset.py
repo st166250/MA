@@ -120,6 +120,59 @@ class NRUDataset(torch.utils.data.Dataset):
 
         return self.transform(self.subjects[idx])
     
+
+class SimCLR3DDatasetTo2D(torch.utils.data.Dataset):
+    def __init__(self, root_path, path_to_train_or_val_keys, transforms, validation=False, small_dataset=False):
+        super().__init__()
+        all_subjects = np.load(path_to_train_or_val_keys, allow_pickle=True)[()]
+        self.subjects, self.subjects_paths = SimCLR3DDatasetTo2D._create_subject_list(Path(root_path), all_subjects, small_dataset, validation)
+        self.validation = validation
+        self.transform = transforms
+        self.small_dataset = small_dataset
+
+    @staticmethod
+    def _create_subject_list(root_path, all_subjects, small_dataset, validation):
+        count = 0
+        subjects = []
+        subjects_paths = []
+        for subject in tqdm(all_subjects):
+            count += 1
+            path = root_path/subject.name/"wat.nii.gz"
+            subjects_paths.append(path)
+            try:
+                tio_subject = tio.Subject(data=tio.ScalarImage(path))
+                subjects.append(tio_subject)
+                #print("tio_subject[data][data].shape: {}".format(tio_subject["data"]["data"].shape))
+            except FileNotFoundError:
+                continue
+
+            if count == 768 and small_dataset == True and validation == True:
+                return subjects, subjects_paths
+            if count == 768 and small_dataset == True:
+                return subjects, subjects_paths
+
+        return subjects, subjects_paths
+
+        
+    def __len__(self):
+        return len(self.subjects)
+    
+    def __getitem__(self ,idx):
+        subject = self.subjects[idx]
+        volume = subject["data"]["data"][0].numpy()
+
+
+        slice_idx = np.random.randint(volume.shape[2])
+        #slice_idx = 100
+        slice_img = volume[:,:,slice_idx]
+
+        #print("idx: {}, slice_idx: {}".format(idx, slice_idx))
+
+        if self.validation:
+            return self.transform(slice_img)
+        
+        xi, xj, _ = self.transform(slice_img)
+        return (xi, xj, _)
         
 
 class SimCLR3DDataset(torch.utils.data.Dataset):
@@ -196,59 +249,6 @@ class ISMRM_Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return self.transform(self.subjects[idx])
 
-class SimCLR3DDatasetTo2D(torch.utils.data.Dataset):
-    def __init__(self, root_path, path_to_train_or_val_keys, transforms, validation=False, small_dataset=False):
-        super().__init__()
-        all_subjects = np.load(path_to_train_or_val_keys, allow_pickle=True)[()]
-        self.subjects, self.subjects_paths = SimCLR3DDatasetTo2D._create_subject_list(Path(root_path), all_subjects, small_dataset, validation)
-        self.validation = validation
-        self.transform = transforms
-        self.small_dataset = small_dataset
-
-    @staticmethod
-    def _create_subject_list(root_path, all_subjects, small_dataset, validation):
-        count = 0
-        subjects = []
-        subjects_paths = []
-        for subject in tqdm(all_subjects):
-            count += 1
-            path = root_path/subject.name/"wat.nii.gz"
-            subjects_paths.append(path)
-            try:
-                tio_subject = tio.Subject(data=tio.ScalarImage(path))
-                subjects.append(tio_subject)
-                #print("tio_subject[data][data].shape: {}".format(tio_subject["data"]["data"].shape))
-            except FileNotFoundError:
-                continue
-
-            if count == 768 and small_dataset == True and validation == True:
-                return subjects, subjects_paths
-            if count == 768 and small_dataset == True:
-                return subjects, subjects_paths
-
-        return subjects, subjects_paths
-
-        
-    def __len__(self):
-        return len(self.subjects)
-    
-    def __getitem__(self ,idx):
-        subject = self.subjects[idx]
-        volume = subject["data"]["data"][0].numpy()
-
-
-        slice_idx = np.random.randint(volume.shape[2])
-        #slice_idx = 100
-        slice_img = volume[:,:,slice_idx]
-
-        #print("idx: {}, slice_idx: {}".format(idx, slice_idx))
-
-        if self.validation:
-            return self.transform(slice_img)
-        
-        xi, xj, _ = self.transform(slice_img)
-        return (xi, xj, _)
-
 class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
     def __init__(self, root_path, path_to_train_or_val_keys, transforms, validation=False, small_dataset=False, datatyp="wat.nii.gz"):
         super().__init__()
@@ -276,9 +276,9 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
             except FileNotFoundError:
                 continue
 
-            if count == 1024 and small_dataset == True and validation == True: #1024 576 #320
+            if count == 128 and small_dataset == True and validation == True: #1024 576 #320
                 return subjects, subjects_paths
-            if count == 10240 and small_dataset == True:                       #7680 1984 #1280
+            if count == 512 and small_dataset == True:                       #7680 1984 #1280
                 return subjects, subjects_paths
 
         return subjects, subjects_paths
@@ -295,5 +295,75 @@ class SimCLR3DDataset_ForMotion(torch.utils.data.Dataset):
             return self.transform(volume, idx)
         
         xi, xj, x_z = self.transform(volume, idx)
+
+        return xi, xj, x_z
+    
+
+
+
+class SimCLR3DDataset_ForMotion_V2(torch.utils.data.Dataset):
+    def __init__(self, root_path, path_to_train_or_val_keys, transforms, validation=False, small_dataset=False, datatyp="wat.nii.gz"):
+        super().__init__()
+        all_subjects = np.load(path_to_train_or_val_keys, allow_pickle=True)[()]
+        self.subjects, self.subjects_paths, self.motion_subjects = SimCLR3DDataset_ForMotion_V2._create_subject_list(Path(root_path), all_subjects, small_dataset, validation, datatyp)
+        self.validation = validation
+        self.transform = transforms
+        self.small_dataset = small_dataset
+        self.datatyp = datatyp
+
+
+    @staticmethod
+    def _create_subject_list(root_path, all_subjects, small_dataset, validation, datatyp):
+        count = 0
+        subjects = []
+        subjects_paths = []
+        motion_subjects = []
+        motion = tio.transforms.RandomMotion(num_transforms=2, degrees=(-5,5), translation=(-5,5)) 
+        for subject in tqdm(all_subjects):
+            count += 1
+            path = root_path/subject.name/datatyp
+            subjects_paths.append(path)
+            try:
+                tio_subject = tio.Subject(data=tio.ScalarImage(path))
+                motion_subject = motion(np.expand_dims(tio_subject["data"]["data"][0].numpy(), axis=0))
+                subject = tio_subject["data"]["data"][0].numpy()
+                subject_short = subject[:,:,55:].copy()
+                subject_final = subject_short[:,:,0::2].copy()
+                del subject
+                del subject_short
+
+                motion_subject_short = motion_subject[0,:,:,55:].copy()
+                motion_subject_final = motion_subject_short[:,:,0::2].copy()
+                del motion_subject
+                del motion_subject_short
+
+                motion_subjects.append(motion_subject_final)
+                subjects.append(subject_final)
+                del subject_final
+                del motion_subject_final
+
+                #print("tio_subject[data][data].shape: {}".format(tio_subject["data"]["data"].shape))
+            except FileNotFoundError:
+                continue
+
+            if count == 1024 and small_dataset == True and validation == True: #1024 576 #320
+                return subjects, subjects_paths, motion_subjects
+            if count == 6144 and small_dataset == True:                       #7680 1984 #1280
+                return subjects, subjects_paths, motion_subjects
+
+        return subjects, subjects_paths, motion_subjects
+    
+
+    def __len__(self):
+        return len(self.subjects)
+    
+    def __getitem__(self ,idx):
+        subject = self.subjects[idx]
+        subject_motion = self.motion_subjects[idx]
+
+        if self.validation:
+            return self.transform(subject, subject_motion, idx)
+        
+        xi, xj, x_z = self.transform(subject, subject_motion, idx)
 
         return xi, xj, x_z
