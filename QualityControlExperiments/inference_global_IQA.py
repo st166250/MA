@@ -467,8 +467,8 @@ model.to(device)
 model.eval()
 
 ###Experiments
-print("EXP UKB")
-exp_UKB()
+#print("EXP UKB")
+#exp_UKB()
 print("EXP NAKO:")
 exp_NAKO_IQA()
 #exp_NRU_brain_data()

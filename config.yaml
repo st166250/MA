@@ -1,6 +1,6 @@
-SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT_noPooling_noMOtion' #where to save the trained model
+SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT_Motion_NoPooling' #where to save the trained model
 WandB_Project: '2GPU Simclr3Slices'
-WandB_Run: 'ViT_NoPoolingNoMotion'
+WandB_Run: 'ViT_Motion_NoPooling'
 # SaveModel: Path to save the model, create folder before executing code
 # WandB_Project, WandB_Run: Names for wandb website
 
@@ -12,11 +12,11 @@ TrainKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_train_keys.
 ValKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_val_keys.npy'
 #Path to train and validation keys in .npy format
 
-BatchSize: 64 #256
+BatchSize: 256 #256
 LearningRate: 0.0006 #max learning rate for scheduler, default = 0.001
 SmallDataset: True # use only 25% of total available data
-Epochs: 2000
-WarmupEpochs: 200
+Epochs: 6000
+WarmupEpochs: 600
 Optimizer: 'Adam'
 Temperature: 0.1 # for ntxent loss
 

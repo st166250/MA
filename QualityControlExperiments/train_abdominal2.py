@@ -24,7 +24,7 @@ shared_dir = os.path.join(script_dir, '..',)
 sys.path.append(os.path.abspath(shared_dir))
 from simclr.simclr_module2 import SimCLR
 from simclr.transforms import SimCLRTrainDataTransform, SimCLREvalDataTransform, SimCLR3SlicesTransform
-from simclr.dataset import SimCLR3DDatasetTo2D, SimCLR3DDataset_ForMotion
+from simclr.dataset import SimCLR3DDatasetTo2D, SimCLR3DDataset_ForMotion_V2
 
 from backbone.ssl_head import SSLHead
 
@@ -189,12 +189,12 @@ def main(rank, world_size):
     preprocessing_train = SimCLR3SlicesTransform()
     preprocessing_val = SimCLR3SlicesTransform()
     t_data = time()
-    train_dataset = SimCLR3DDataset_ForMotion(cfg['DatasetPath'], cfg['TrainKeysPath'],
+    train_dataset = SimCLR3DDataset_ForMotion_V2(cfg['DatasetPath'], cfg['TrainKeysPath'],
                      preprocessing_train, validation=False, small_dataset=cfg['SmallDataset'], datatyp=cfg['DataTyp'])
     train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True, drop_last=True)
     trainloader = DataLoader(train_dataset, batch_size=cfg['BatchSize'], sampler=train_sampler, num_workers=0, pin_memory=True)
     
-    val_dataset = SimCLR3DDataset_ForMotion(cfg['DatasetPath'], cfg['ValKeysPath'],
+    val_dataset = SimCLR3DDataset_ForMotion_V2(cfg['DatasetPath'], cfg['ValKeysPath'],
                       preprocessing_val, validation=True, small_dataset=cfg['SmallDataset'], datatyp=cfg['DataTyp'])
     val_sampler = DistributedSampler(val_dataset, num_replicas=world_size, rank=rank, shuffle=False, drop_last=True)
     valloader = DataLoader(val_dataset, batch_size=cfg['BatchSize'], sampler=val_sampler, num_workers=0, pin_memory=True)
@@ -244,7 +244,7 @@ def main(rank, world_size):
                     "epoch": e+1
                 })
         
-            if e > 1500 and ((e+1) % 100 == 0 or (e+1==2000)):
+            if e > 3000 and ((e+1) % 500 == 0 or (e+1==6000)):
                 model_save_path = os.path.join(cfg['SaveModel'], f"simclr3Slices{(e+1)/2}_loss_{train_loss}.pth") #ToDo: Change Model name
                 torch.save(model.state_dict(), model_save_path)
 
