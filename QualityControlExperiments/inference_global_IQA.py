@@ -396,7 +396,7 @@ def exp_incr_motion():
         axs[i].set_title(f'Motion {i}: sim HQ: {round(float(sim_HQ), 3)}/ sim LQ: {round(float(sim_LQ), 3)}')
         axs[i].axis('off')
 
-    plt.savefig('/home/students/studhoene1/imagequality/QualityControlExperiments/results/3SLices_NTXENT/exp31_setting_motion_sim.png')
+    plt.savefig('/home/students/studhoene1/imagequality/QualityControlExperiments/results/3SLices_NTXENT/VIT1.png')
 
 #Experiment: Increasing noise 
 def exp_incr_noise():
@@ -440,12 +440,22 @@ def exp_incr_noise():
 
 
 model = SimCLR(arch="resnet50")
-model.load_state_dict(torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp31_noPad__NoSimMotion_1000Epochs/simclr3Slices_changePosNeg_randomMotion_epoch500.0_loss_0.023298370504849834.pth'))
+#model.load_state_dict(torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/exp17_newData_1000Epoch/simclr3Slices500.0_loss_1.2197948694229126.pth'))
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/first_wat_crop_02TO1/checkpoints/epoch=372-step=5287275.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/students/studhoene1/test_imqual/imagequality/checkpoints/from_scratch_small_datasetepoch=05_train_loss=0.06.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_4/checkpoints/epoch=892-step=12658275.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_5/checkpoints/epoch=217-step=3090150.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_8/checkpoints/epoch=179-step=5103000.ckpt")
+
+checkpoint = torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT1/simclr3Slices1000.0_loss_1.543333649635315.pth')
+
+new_state_dict = {}
+for key, value in checkpoint.items():
+    new_key = key.replace("module.", "")  # Remove 'module.' from keys
+    new_state_dict[new_key] = value
+
+# Load into the model
+model.load_state_dict(new_state_dict)
 
 device = torch.device("cuda:0")
 model.to(device)
