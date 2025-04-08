@@ -37,6 +37,29 @@ class Projection(nn.Module):
         x = self.model(x)
         return F.normalize(x, dim=1)
 
+class Projection2(nn.Module):
+    def __init__(self, input_dim=49*768, hidden_dim=2048, output_dim=128):
+        super().__init__()
+        self.output_dim = output_dim
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+
+        self.model = nn.Sequential(
+            nn.Linear(self.input_dim, self.hidden_dim*4),
+            nn.BatchNorm1d(self.hidden_dim*4),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(self.hidden_dim*4, self.hidden_dim),
+            nn.BatchNorm1d(self.hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(self.hidden_dim, self.output_dim, bias=False),
+        )
+
+    def forward(self, x):
+        x = self.model(x)
+        return F.normalize(x, dim=1)
+    
 class SSLHead(nn.Module):
     """Almost same as SSL_SwinUNet/models/ssl_head.py
     """

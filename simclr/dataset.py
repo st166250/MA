@@ -344,9 +344,9 @@ class SimCLR3DDataset_ForMotion_V2(torch.utils.data.Dataset):
             except FileNotFoundError:
                 continue
 
-            if count == 1024 and small_dataset == True and validation == True: #1024 576 #320
+            if count == 256 and small_dataset == True and validation == True: #1024 576 #320
                 return subjects, subjects_paths, motion_subjects
-            if count == 5120 and small_dataset == True:                       #7680 1984 #1280
+            if count == 256 and small_dataset == True:                       #7680 1984 #1280
                 return subjects, subjects_paths, motion_subjects
 
         return subjects, subjects_paths, motion_subjects
@@ -365,3 +365,93 @@ class SimCLR3DDataset_ForMotion_V2(torch.utils.data.Dataset):
         xi, xj, x_z = self.transform(subject, subject_motion, idx)
 
         return xi, xj, x_z
+    
+
+class NakoIQADataset_SimCLR(torch.utils.data.Dataset):
+    def __init__(self, root_path, transforms, validation):
+        super().__init__()
+        root_path = Path(root_path)
+        all_subjects = list(root_path.glob("*"))
+        self.subjects_hq, self.subjects_lq = NakoIQADataset_SimCLR._create_subject_list(root_path, all_subjects, validation)
+        self.transform = transforms
+    
+    @staticmethod
+    def _create_subject_list(root_path, all_subjects, validation):
+        subjects_hq = []
+        subjects_lq = []
+        suffix = "bh_W_COMPOSED"
+        if validation == False:
+            for subject in tqdm(all_subjects):
+                if str(subject).endswith(('Q1', 'Q2', 'Q3', 'Q4', 'Q5')):
+                    pass
+                else: 
+                    print("HQ " + str(subject) + " in train set")
+                    if str(subject) != "/mnt/qdata/rawdata/NAKO_IQA/NAKO_IQA_nifti/Q3" or suffix != "fb_deep_W_COMPOSED":  #dicom_3D_GRE_TRA_fb_deep_W_COMPOSED.nii under Q3 seems corrupted and leads to an error
+                        path = root_path/subject/"dixon"/"dicom_3D_GRE_TRA"
+                        path = str(path)+"_"+"bh_W_COMPOSED"+".nii"
+                        try:
+                            tio_subject = tio.Subject(data=tio.ScalarImage(path))
+                            volume = tio_subject["data"]["data"][0].numpy()
+                            subjects_hq.append(volume)
+                        except FileNotFoundError as e:
+                            print(e)
+                            continue
+            suffix = "fb_deep_W_COMPOSED"
+            for subject in tqdm(all_subjects):
+                if str(subject).endswith(('Q1', 'Q2', 'Q3', 'Q4', 'Q5')):
+                    pass
+                else:
+                    print("LQ " + str(subject) + " in train set")
+                    if str(subject) != "/mnt/qdata/rawdata/NAKO_IQA/NAKO_IQA_nifti/Q3" or suffix != "fb_deep_W_COMPOSED":  #dicom_3D_GRE_TRA_fb_deep_W_COMPOSED.nii under Q3 seems corrupted and leads to an error
+                        path = root_path/subject/"dixon"/"dicom_3D_GRE_TRA"
+                        path = str(path)+"_"+"fb_deep_W_COMPOSED"+".nii"
+                        try:
+                            tio_subject = tio.Subject(data=tio.ScalarImage(path))
+                            volume = tio_subject["data"]["data"][0].numpy()
+                            subjects_lq.append(volume)
+                        except FileNotFoundError as e:
+                            print(e)
+                            continue               
+            return subjects_hq, subjects_lq
+        
+        if validation == True:
+            for subject in tqdm(all_subjects):
+                if str(subject).endswith(('Q3', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10', 'Q11', 'Q12', 'Q13', 'Q14', 'Q15', 'Q16', 'Q17', 'Q18', 'Q19')):
+                    pass
+                else: 
+                    print("HQ " + str(subject) + " in val set")
+                    if str(subject) != "/mnt/qdata/rawdata/NAKO_IQA/NAKO_IQA_nifti/Q3" or suffix != "fb_deep_W_COMPOSED":  #dicom_3D_GRE_TRA_fb_deep_W_COMPOSED.nii under Q3 seems corrupted and leads to an error
+                        path = root_path/subject/"dixon"/"dicom_3D_GRE_TRA"
+                        path = str(path)+"_"+"bh_W_COMPOSED"+".nii"
+                        try:
+                            tio_subject = tio.Subject(data=tio.ScalarImage(path))
+                            volume = tio_subject["data"]["data"][0].numpy()
+                            subjects_hq.append(volume)
+                        except FileNotFoundError as e:
+                            print(e)
+                            continue
+            suffix = "fb_deep_W_COMPOSED"
+            for subject in tqdm(all_subjects):
+                if str(subject).endswith(('Q3', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10', 'Q11', 'Q12', 'Q13', 'Q14', 'Q15', 'Q16', 'Q17', 'Q18', 'Q19')):
+                    pass
+                else:
+                    print("LQ " + str(subject) + " in val set")
+                    if str(subject) != "/mnt/qdata/rawdata/NAKO_IQA/NAKO_IQA_nifti/Q3" or suffix != "fb_deep_W_COMPOSED":  #dicom_3D_GRE_TRA_fb_deep_W_COMPOSED.nii under Q3 seems corrupted and leads to an error
+                        path = root_path/subject/"dixon"/"dicom_3D_GRE_TRA"
+                        path = str(path)+"_"+"fb_deep_W_COMPOSED"+".nii"
+                        try:
+                            tio_subject = tio.Subject(data=tio.ScalarImage(path))
+                            volume = tio_subject["data"]["data"][0].numpy()
+                            subjects_lq.append(volume)
+                        except FileNotFoundError as e:
+                            print(e)
+                            continue
+            return subjects_hq, subjects_lq
+        
+
+    def __len__(self):
+        return len(self.subjects_hq)
+    
+    def __getitem__(self ,idx):
+        return self.transform(self.subjects_hq[idx], self.subjects_lq[idx])
+    

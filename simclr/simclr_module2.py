@@ -68,6 +68,7 @@ class SimCLR(nn.Module):
         feat_dim: int = 128,
         first_conv: bool = True,
         maxpool1: bool = True,
+        freeze_encoder: bool = True,
         **kwargs
     ):
 
@@ -83,6 +84,14 @@ class SimCLR(nn.Module):
         self.encoder = self.init_model()
 
         self.projection = Projection(input_dim=self.hidden_mlp, hidden_dim=self.hidden_mlp, output_dim=self.feat_dim)
+
+        if freeze_encoder:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            for module in self.encoder.modules():
+                 if isinstance(module, nn.BatchNorm2d):
+                    # Set batch normalization layers to eval mode (to freeze running stats)
+                    module.eval()  
 
     def init_model(self):
         if self.arch == "resnet18":
@@ -105,8 +114,20 @@ class SimCLR(nn.Module):
         zMotion = self.projection(hMotion)
         
         return z1, z2, zMotion
-
+    
+    def finetune_step(self, x1, x2, x3):
+        h1 = self.encoder(x1.float())[-1]
+        h2 = self.encoder(x2.float())[-1]
+        h3 = self.encoder(x3.float())[-1]
+        z1 = self.projection(h1)
+        z2 = self.projection(h2)
+        z3 = self.projection(h3)
+        return z1, z2, z3
 
     
     def forward(self, x):
         return self.encoder(x)[-1]
+
+    def inference(self, x):
+        z = self.encoder(x)[-1] 
+        return self.projection(z)

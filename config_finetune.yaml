@@ -1,6 +1,6 @@
-SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT_Exp5_LARSXX' #where to save the trained model
-WandB_Project: '2GPU Simclr3Slices'
-WandB_Run: 'MixedPrecision'
+SaveModel: '/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_finetune/Exp3_2_long' #where to save the trained model
+WandB_Project: '2GPU Finetune'
+WandB_Run: 'Exp3_2_long'
 # SaveModel: Path to save the model, create folder before executing code
 # WandB_Project, WandB_Run: Names for wandb website
 
@@ -12,11 +12,11 @@ TrainKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_train_keys.
 ValKeysPath: '/home/students/studhoene1/imagequality/ukb_abdominal_val_keys.npy'
 #Path to train and validation keys in .npy format
 
-BatchSize: 128 #256
-LearningRate: 0.01 #max learning rate for scheduler, default = 0.001
+BatchSize: 64 #256
+LearningRate: 0.001 #max learning rate for scheduler, default = 0.001
 SmallDataset: True # use only 25% of total available data
-Epochs: 6000
-WarmupEpochs: 600
+Epochs: 5000
+WarmupEpochs: 500
 Optimizer: 'Adam'
 Temperature: 0.1 # for ntxent loss
 

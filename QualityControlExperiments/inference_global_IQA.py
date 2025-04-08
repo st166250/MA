@@ -263,13 +263,13 @@ def exp_NAKO_IQA():
     sim_LQ = []
     for idx in ref_idx:
         # load test slice
-        slc_test = load_slice_nako(test_id, slc)
-        #slc_test = load_slice_nako_deep(test_id, slc)
+        #slc_test = load_slice_nako(test_id, slc)
+        slc_test = load_slice_nako_deep(test_id, slc)
     
         # load reference slices
         noise = tio.Compose([tio.transforms.RandomNoise(mean=0, std=(0, 0.7))])
-        motion = tio.Motion(degrees=np.array([[1.5, 1.5, 1.5]]), translation=np.array([[1.5, 1.5, 1.5]]), times=np.array([0.5]), image_interpolation='linear')
-        #motion = tio.Compose([tio.transforms.RandomMotion(num_transforms=1, )])
+        #motion = tio.Motion(degrees=np.array([[1.5, 1.5, 1.5]]), translation=np.array([[1.5, 1.5, 1.5]]), times=np.array([0.5]), image_interpolation='linear')
+        motion = tio.transforms.RandomMotion(num_transforms=2, degrees=(-1,1), translation=(-1,1)) 
 
         slc_HQ = load_slice_nako(idx, slc)
         #slc_LQ = load_slice_nako(idx, slc, motion)
@@ -295,6 +295,18 @@ def exp_NAKO_IQA():
             slc_test = torch.from_numpy(slc_test).unsqueeze(0)
     
         # compute feature representations
+        # plt.imshow(np.rot90(slc_test[0], 1), cmap='gray')
+        # plt.title(f'slice test{idx}')
+        # plt.show()
+        # plt.savefig(f'/home/students/studhoene1/imagequality/QualityControlExperiments/results/slice_test.png')
+        # plt.imshow(np.rot90(slc_LQ[0], 1), cmap='gray')
+        # plt.title(f'slice LQ{idx}')
+        # plt.show()
+        # plt.savefig(f'/home/students/studhoene1/imagequality/QualityControlExperiments/results/slice_LQ{idx}.png')
+        # plt.imshow(np.rot90(slc_HQ[0], 1), cmap='gray')
+        # plt.title(f'slice HQ{idx}')
+        # plt.show()
+        # plt.savefig(f'/home/students/studhoene1/imagequality/QualityControlExperiments/results/slice_HQ{idx}.png')
         feat_test = model(slc_test.unsqueeze(0).to(device))
         feat_HQ = model(slc_HQ.unsqueeze(0).to(device))
         feat_LQ = model(slc_LQ.unsqueeze(0).to(device))
@@ -302,6 +314,8 @@ def exp_NAKO_IQA():
         # compute cosine similarity
         sim_HQ.append(F.cosine_similarity(feat_test, feat_HQ))
         sim_LQ.append(F.cosine_similarity(feat_test, feat_LQ))
+        print(F.cosine_similarity(model(load_slice_nako(14, slc).unsqueeze(0).to(device)), model(load_slice_nako_deep(13, slc).unsqueeze(0).to(device))))
+
     print(sim_HQ)
     print(sim_LQ)
     sim_HQ = torch.stack(sim_HQ).mean()
@@ -401,7 +415,7 @@ def exp_incr_motion():
         axs[i].set_title(f'Motion {i}: sim HQ: {round(float(sim_HQ), 3)}/ sim LQ: {round(float(sim_LQ), 3)}')
         axs[i].axis('off')
 
-    plt.savefig('/home/students/studhoene1/imagequality/QualityControlExperiments/results/3SLices_NTXENT/2gpu_ViT_setting_motion_sim.png')
+    plt.savefig('/home/students/studhoene1/imagequality/QualityControlExperiments/results/3SLices_NTXENT/2gpu_ViT_LARS4.png')
 
 #Experiment: Increasing noise 
 def exp_incr_noise():
@@ -444,15 +458,15 @@ def exp_incr_noise():
     plt.close()
 
 
-#model = SimCLR(arch="resnet50")
-model = SSLHead()
+model = SimCLR(arch="resnet50")
+#model = SSLHead()
 #model.load_state_dict(torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp40/simclr3Slices_randomMotion_epoch500.0_loss_0.0226720763790992.pth'))
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/first_wat_crop_02TO1/checkpoints/epoch=372-step=5287275.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/students/studhoene1/test_imqual/imagequality/checkpoints/from_scratch_small_datasetepoch=05_train_loss=0.06.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp35_2_moreData/simclr3Slices_randomMotion_epoch500.0_loss_0.01984104802531581.pth")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_5/checkpoints/epoch=217-step=3090150.ckpt")
 #model = SimCLR.load_from_checkpoint("/home/raecker1/3DSSL/weights/version_8/checkpoints/epoch=179-step=5103000.ckpt")
-checkpoint = torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT1/simclr3Slices1000.0_loss_1.543333649635315.pth')
+checkpoint = torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_4GPU/simclr3Slices5000.0_loss_5.590002059936523.pth')
 # Remove the "module." prefix if present
 new_state_dict = {}
 for key, value in checkpoint.items():
@@ -472,6 +486,6 @@ model.eval()
 print("EXP NAKO:")
 exp_NAKO_IQA()
 #exp_NRU_brain_data()
-print("EXP Motion Increase:")
-exp_incr_motion()
+#print("EXP Motion Increase:")
+#exp_incr_motion()
 #exp_incr_noise()

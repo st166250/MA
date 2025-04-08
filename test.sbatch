@@ -9,7 +9,7 @@
 #SBATCH --job-name=TutorialJob
 #SBATCH --cpus-per-task=4
 #SBATCH --partition=student
-#SBATCH --gpus=2
+#SBATCH --gpus=1
 #SBATCH --time 7-0
 #SBATCH --nodelist=node-gpu-01
 #SBATCH --error=jobs_2gpu/job.%J.%x.err
@@ -18,4 +18,4 @@
 echo "Job started on $(date)"
 module load cuda/11.8
 
-/home/students/studhoene1/.conda/envs/mypythonenvi/bin/python QualityControlExperiments/train_abdominal2.py
+/home/students/studhoene1/.conda/envs/mypythonenvi/bin/python QualityControlExperiments/visualization.py

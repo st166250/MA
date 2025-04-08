@@ -49,19 +49,19 @@ tsne_loader_nako_deep = DataLoader(tsne_nako_iqa_dataset_deep, batch_size=1, shu
 
 #model = SimCLR.load_from_checkpoint('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/simclr_epoch10_loss_6.282579112052917.pth')
 #model = SimCLR.load_from_checkpoint("/home/students/studhoene1/imagequality/checkpoints/simclr2_NTXENT2_epoch=64_train_loss=6.13.ckpt")
-#model = SimCLR(arch="resnet50")
-model = SSLHead()
+model = SimCLR(arch="resnet50")
+#model = SSLHead()
 
 #model.load_state_dict(torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints/exp34_noPad__NoSimMotion_BS128_posDenom/simclr3Slices_changePosNeg_randomMotion_epoch500.0_loss_0.7203241523943449.pth'))
-checkpoint = torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_2gpu/ViT_meanPoolingNoMotion/simclr3Slices1000.0_loss_1.6866214275360107.pth')
+checkpoint = torch.load('/home/students/studhoene1/imagequality/QualityControlExperiments/checkpoints_finetune/Exp3_2_long/simclr3Slices5000_loss_0.002695805160328746.pth')
 # Remove the "module." prefix if present
-new_state_dict = {}
-for key, value in checkpoint.items():
-    new_key = key.replace("module.", "")  # Remove 'module.' from keys
-    new_state_dict[new_key] = value
+#new_state_dict = {}
+#for key, value in checkpoint.items():
+#    new_key = key.replace("module.", "")  # Remove 'module.' from keys
+#    new_state_dict[new_key] = value
 
 # Load into the model
-model.load_state_dict(new_state_dict)
+#model.load_state_dict(new_state_dict)
 
 device = torch.device("cuda:0")
 model.to(device)
@@ -123,7 +123,7 @@ with torch.no_grad():
             #image = preprocessings2D(image.unsqueeze(-1))
             #image = image.squeeze(-1)
 
-            feat_deep = model(image.unsqueeze(0).to(device))
+            feat_deep = model.inference(image.unsqueeze(0).to(device))
          
             feature_list.append(feat_deep)
             label_list.append(torch.tensor([4]))
@@ -166,8 +166,8 @@ with torch.no_grad():
              #      plt.show()
              #      plt.close()
 
-            feat_bh_hq = model(image.unsqueeze(0).to(device))
-            feat_bh_lq = model(image_noise.unsqueeze(0).to(device))
+            feat_bh_hq = model.inference(image.unsqueeze(0).to(device))
+            feat_bh_lq = model.inference(image_noise.unsqueeze(0).to(device))
            
             feature_list.append(feat_bh_hq)
             label_list.append(torch.tensor([3]))
@@ -218,8 +218,8 @@ with torch.no_grad():
             # print("mean input shape hq: {}".format(torch.mean(image.unsqueeze(0))))
             # print("mean input shape lq: {}".format(torch.mean(image_noise.unsqueeze(0).unsqueeze(0))))
 
-            feat_hq = model(image.unsqueeze(0).to(device))
-            feat_lq = model(image_noise.unsqueeze(0).to(device))
+            feat_hq = model.inference(image.unsqueeze(0).to(device))
+            feat_lq = model.inference(image_noise.unsqueeze(0).to(device))
             
             # print("mean output shape hq: {}".format(torch.mean(feat_hq)))
             # print("mean output shape lq : {}".format(torch.mean(feat_lq)))
@@ -253,5 +253,5 @@ handles = [plt.Line2D([0], [0], marker='o', color='w', label=word_labels[labels]
 plt.legend(handles=handles, title='classes')
 plt.title("NTXENT with 3 Slices: Random Motion NAKO, degrees={}, translation={}, time={}".format(degrees, translation, times))
 plt.colorbar=scatter
-plt.savefig('/home/students/studhoene1/imagequality/tsne_figs_3Slices_Ntxent/ViT1_meanPooling_noMotion.png')
+plt.savefig('/home/students/studhoene1/imagequality/tsne_finetune/Exp3_long5000.png')
 plt.show()

@@ -16,7 +16,8 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
-
+import torch_optimizer as optim
+from torch.cuda.amp import autocast, GradScaler
 #sys.path.append("/home/students/studhoene1/imagequality/")
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -111,17 +112,22 @@ def train(model, dataloader, optimizer, scheduler, device, temperature, epoch, r
 
     dataloader.sampler.set_epoch(epoch) #Ensure different shuffing per epoch
 
+    scaler = GradScaler()
+
     for i, batch in enumerate(dataloader):
+        optimizer.zero_grad()
+
         img1, img2, img_motion = batch
         img1, img2, img_motion = img1.to(device), img2.to(device), img_motion.to(device)
 
-        optimizer.zero_grad()
-        z1, z2, zMotion = model.module.train_step(img1, img2, img_motion)
+        with autocast():
+            z1, z2, zMotion = model.module.train_step(img1, img2, img_motion)
 
-        loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
-        loss.backward()
+            loss = nt_xent_loss3Batch(z1, z2, zMotion, temperature)
+        scaler.scale(loss).backward()
 
-        optimizer.step()
+        scaler.step(optimizer)
+        scaler.update()
         if scheduler is not None:
             scheduler.step()
 
@@ -224,7 +230,8 @@ def main(rank, world_size):
             progress = (step-warmup_steps) / max(1, total_steps-warmup_steps)
             return 0.5 * (1.0 + math.cos(math.pi * progress))
         
-    optimizer = torch.optim.Adam(model.parameters(), lr=cfg['LearningRate'])
+    #optimizer = torch.optim.Adam(model.parameters(), lr=cfg['LearningRate'])
+    optimizer = optim.LARS(model.parameters(), lr=cfg['LearningRate'], weight_decay=1e-6, momentum=0.9)
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_schedule)
 
     for e in range(cfg['Epochs']):
@@ -236,7 +243,7 @@ def main(rank, world_size):
             print("Train Loss for epoch {}: {:.3f}".format(e+1, train_loss))
             print("Validation Loss for epoch {}: {:.3f}".format(e+1, val_loss))
             print("Time for training epoch {}/{}: {:.2f} Min.".format(e+1, cfg['Epochs'], (time()-t1)/60))
-            if (e%4 == 0):
+            if (e%2 == 0):
                 wandb.log({
                     "train loss": train_loss,
                     "val loss": val_loss,
@@ -244,7 +251,7 @@ def main(rank, world_size):
                     "epoch": e+1
                 })
         
-            if e > 3000 and ((e+1) % 500 == 0 or (e+1==6000)):
+            if e > 5000 and ((e+1) % 200 == 0 or (e+1==6000)):
                 model_save_path = os.path.join(cfg['SaveModel'], f"simclr3Slices{(e+1)/2}_loss_{train_loss}.pth") #ToDo: Change Model name
                 torch.save(model.state_dict(), model_save_path)
 

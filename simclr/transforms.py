@@ -194,3 +194,42 @@ class SimCLR3SlicesTransform(object):
             x_z = self.train_transform(slice_img)
 
         return x_i, x_j, x_z
+    
+
+class FineTuneTransform(object):
+    def __init__(self, input_height: int = 224):
+        self.input_height = input_height
+        rescale = RescaleTo01()
+
+        data_transforms = [
+            rescale,
+            transforms.ToTensor(),
+            transforms.RandomResizedCrop(size=(self.input_height,self.input_height), scale=(0.2, 1))
+        ]
+
+        data_transforms = transforms.Compose(data_transforms)
+        self.train_transform = transforms.Compose([data_transforms])
+
+        self.transform3D = tio.transforms.Compose([
+            tio.transforms.ZNormalization(masking_method=None),
+        ])
+
+    
+    def __call__(self, volume_hq, volume_lq):
+        decider = random.choice([0,1])
+
+        slice_idx = np.random.randint(volume_hq.shape[2])
+        slice_hq = volume_hq[:,:,slice_idx]
+        slice_lq = volume_lq[:,:,slice_idx]
+
+        #slice_img = np.pad(slice_img, ((0,0), (28,28)))
+        #slice_motion = np.pad(slice_motion, ((0,0), (28,28)))
+        if decider == 0:
+            x_i1 = self.train_transform(slice_hq)
+            x_i2 = self.train_transform(slice_hq)
+            x_j = self.train_transform(slice_lq)
+        elif decider == 1:
+            x_i1 = self.train_transform(slice_lq)
+            x_i2 = self.train_transform(slice_lq)
+            x_j = self.train_transform(slice_hq)
+        return x_i1, x_i2, x_j
